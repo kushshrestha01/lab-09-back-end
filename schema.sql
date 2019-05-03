@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS location, weather, events, movies, restaurants
+DROP TABLE IF EXISTS location, weather, events, movies, restaurants;
 CREATE TABLE location (
     id SERIAL,
     latitude DECIMAL,
@@ -39,9 +39,10 @@ CREATE TABLE movies (
 );
 
 CREATE TABLE restaurants (
-    name
-    image_url
-    price
-    rating
-    url
+    name TEXT,
+    image_url TEXT,
+    price TEXT,
+    rating TEXT,
+    url TEXT,
+    created_at BIGINT
 );
