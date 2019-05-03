@@ -15,6 +15,17 @@ Finish time: 1055
 
 Actual time needed to complete: 1 hour 55 mins
 
+# Feature 2
+Number and name of feature: Yelp, Feature 2
+
+Estimate of time needed to complete: 1 hour
+
+Start time: 1055
+
+Finish time: 1140
+
+Actual time needed to complete: 45 mins
+
 ## Overview
 <!-- Provide a high level overview of what this application is and why you are building it, beyond the fact that it's an assignment for this class. (i.e. What's your problem domain?) -->
 
