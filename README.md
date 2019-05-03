@@ -26,6 +26,22 @@ Finish time: 1140
 
 Actual time needed to complete: 45 mins
 
+# Feature 3
+Number and name of feature: Cache Invalidation, Feature 3
+
+Estimate of time needed to complete: 2 hour
+
+Start time: 1140
+
+Finish time: 
+
+Actual time needed to complete: 
+
+## Usage:
+In the CLI, run: $ node server.js
+
+Or go to:  https://lit-mesa-34002.herokuapp.com/
+
 ## Overview
 <!-- Provide a high level overview of what this application is and why you are building it, beyond the fact that it's an assignment for this class. (i.e. What's your problem domain?) -->
 
