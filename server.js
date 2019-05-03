@@ -38,6 +38,16 @@ const Event = function(res) {
   this.summary = res.summary;
 };
 
+//Constructor for movie
+const Movie = function(res) {
+  this.title = res.title;
+  this.overview = res.overview;
+  this.average_votes = res.vote_average;
+  this.image_url = `https://image.tmdb.org/t/p/w500/${res.poster_path}`;
+  this.popularity = res.popularity;
+  this.released_on = res.released_date;
+};
+
 // Database Setup
 //            postgres protocol
 const client = new pg.Client(process.env.DATABASE_URL);
@@ -81,6 +91,17 @@ app.get('/events', (request, response) => {
   }
 });
 
+//route for movie
+app.get('/movies', (request, response) => {
+  try {
+    getMovies(request.query.data)
+      .then(movies => response.send(movies))
+      .catch(error => errorHandling(error, response));
+  } catch( error ) {
+    errorHandling(error, response);
+  }
+});
+
 // Function for getting all the daily weather
 function getDailyWeather(weatherData){
   console.log('in getDailyWeather');
@@ -100,6 +121,14 @@ function errorHandling(error, response){
 function processEvents(eventsData) {
   return eventsData.map( event => {
     return new Event(event);
+  });
+}
+
+//helper to process movies
+function processMovies(moviesData) {
+  console.log(moviesData);
+  return moviesData.map(movie => {
+    return new Movie(movie);
   });
 }
 
@@ -183,6 +212,16 @@ function getEvents(query) {
       }
     });
 
+}
+
+//movies endpoint handler
+function getMovies(query){
+  let movieURL = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIE_API_KEY}&language=en-US&query=${query}&include_adult=false&page=1`;
+  return superagent.get(movieURL)
+    .then(moviesApiResponse => {
+      let movies = processMovies(moviesApiResponse.body.results);
+      return movies;
+    });
 }
 
 
