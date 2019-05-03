@@ -81,6 +81,17 @@ app.get('/events', (request, response) => {
   }
 });
 
+//route for movie
+app.get('/movies', (request, response) => {
+  try {
+    getMovies(request.query.data)
+      .then(movies => response.send(movies))
+      .catch(error => errorHandling(error, response));
+  } catch( error ) {
+    errorHandling(error, response);
+  }
+});
+
 // Function for getting all the daily weather
 function getDailyWeather(weatherData){
   console.log('in getDailyWeather');
