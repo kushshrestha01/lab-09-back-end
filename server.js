@@ -45,7 +45,7 @@ const Movie = function(res) {
   this.average_votes = res.vote_average;
   this.image_url = `https://image.tmdb.org/t/p/w500/${res.poster_path}`;
   this.popularity = res.popularity;
-  this.released_on = res.released_date;
+  this.released_on = res.release_date;
 };
 
 //Constructor for Yelp
@@ -55,7 +55,7 @@ const Restaurant = function(res) {
   this.price = res.price;
   this.rating = res.rating;
   this.url = res.url;
-}
+};
 
 // Database Setup
 //            postgres protocol
