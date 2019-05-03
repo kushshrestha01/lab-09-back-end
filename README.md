@@ -4,6 +4,17 @@
 
 **Version**: 1.0.0 
 
+# Feature 1
+Number and name of feature: Movies, Feature 1
+
+Estimate of time needed to complete: 1 hour
+
+Start time: 0900
+
+Finish time: 1055
+
+Actual time needed to complete: 1 hour 55 mins
+
 ## Overview
 <!-- Provide a high level overview of what this application is and why you are building it, beyond the fact that it's an assignment for this class. (i.e. What's your problem domain?) -->
 
