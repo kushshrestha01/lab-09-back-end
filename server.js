@@ -48,6 +48,15 @@ const Movie = function(res) {
   this.released_on = res.released_date;
 };
 
+//Constructor for Yelp
+const Restaurant = function(res) {
+  this. name = res.name;
+  this.image_url = res.image_url;
+  this.price = res.price;
+  this.rating = res.rating;
+  this.url = res.url;
+}
+
 // Database Setup
 //            postgres protocol
 const client = new pg.Client(process.env.DATABASE_URL);
@@ -102,6 +111,16 @@ app.get('/movies', (request, response) => {
   }
 });
 
+app.get('/yelp', (request,response) => {
+  try {
+    getRestaurants(request.query.data)
+      .then(restaurants => response.send(restaurants))
+      .catch(error => errorHandling(error, response));
+  } catch( error ) {
+    errorHandling(error, response);
+  }
+});
+
 // Function for getting all the daily weather
 function getDailyWeather(weatherData){
   console.log('in getDailyWeather');
@@ -126,9 +145,15 @@ function processEvents(eventsData) {
 
 //helper to process movies
 function processMovies(moviesData) {
-  console.log(moviesData);
   return moviesData.map(movie => {
     return new Movie(movie);
+  });
+}
+
+//helper to process yelp
+function processRestaurant(yelpData) {
+  return yelpData.map(restaurant => {
+    return new Restaurant(restaurant);
   });
 }
 
@@ -221,6 +246,17 @@ function getMovies(query){
     .then(moviesApiResponse => {
       let movies = processMovies(moviesApiResponse.body.results);
       return movies;
+    });
+}
+
+//yelp endpoint handler
+function getRestaurants(query){
+  let yelpURL = `https://api.yelp.com/v3/businesses/search?term=restaurant&location=${query}`;
+  return superagent.get(yelpURL)
+    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+    .then(yelpApiResponse => {
+      let restaurants = processRestaurant(yelpApiResponse.body.businesses);
+      return restaurants;
     });
 }
 
