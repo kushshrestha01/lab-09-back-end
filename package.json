@@ -1,0 +1,27 @@
+{
+  "name": "lab08-back-end",
+  "version": "1.0.0",
+  "description": "lab08-back-end",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kushshrestha01/lab-09-back-end.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kushshrestha01/lab-09-back-end"
+  },
+  "homepage": "https://github.com/kushshrestha01/lab-09-back-end/README.md",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^7.0.0",
+    "express": "^4.16.4",
+    "pg": "^7.10.0",
+    "superagent": "^5.0.5"
+  }
+}
