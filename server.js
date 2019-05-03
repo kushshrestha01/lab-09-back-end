@@ -1,156 +1,189 @@
 'use strict';
 
 require('dotenv').config();
-const superagent = require('superagent');
 const express = require('express');
 const app = express();
 const cors = require('cors');
-const PORT = process.env.PORT || 3000;
+const superagent = require('superagent');
 const pg = require('pg');
 
+// Variable for holding current location
+// use environment variable, or, if it's undefined, use 3000 by default
+const PORT = process.env.PORT || 3000;
+
+//static files
 app.use(cors());
 
-const pgClient = new pg.Client(process.env.DATABASE_URL);
-pgClient.connect();
+// Constructor for the Location response from API
+const Location = function(query, res){
+  this.search_query = query;
+  this.formatted_query = res.results[0].formatted_address;
+  this.latitude = res.results[0].geometry.location.lat;
+  this.longitude = res.results[0].geometry.location.lng;
+};
 
-app.get('/location', (request, response) => {
-  const queryData = request.query.data;
-  checkLocationDB(queryData,response);
-});
-
-app.get('/weather', (request, response) => {
-  checkOtherDB(request, response, 'weather', errorHandler);
-});
-
-app.get('/events', (request, response) => {
-  checkOtherDB(request, response, 'event', errorHandler);
-});
-
-
-app.use('*', (request, response) => response.send('Sorry, that route does not exist.'));
-
-app.listen(PORT,() => console.log(`Listening on port ${PORT}`));
-
-const Location = function(searchQuery, jsonData) {
-  const formattedQuery = jsonData['formatted_address'];
-  const latitude = jsonData['geometry']['location']['lat'];
-  const longitude = jsonData['geometry']['location']['lng'];
-
-  this.search_query = searchQuery;
-  this.formatted_query = formattedQuery;
+// Constructor for a DaysWeather.
+const DaysWeather = function(forecast, time, latitude, longitude){
+  this.forecast = forecast;
   this.latitude = latitude;
   this.longitude = longitude;
+  this.time = new Date(time * 1000).toDateString();
 };
 
-const Weather = function(jsonData) {
-  this.dailyForecast = [...jsonData.body.daily.data].map(forecast => {
-    const summary = forecast['summary'];
-    const time = (new Date(forecast['time'] * 1000)).toDateString();
-    return {
-      'forecast': summary,
-      'time': time
-    };
-  });
+//Constructor for eventInstance
+const Event = function(res) {
+  this.link = res.url;
+  this.name = res.name.text;
+  this.event_date = new Date(res.start.utc).toDateString();
+  this.summary = res.summary;
 };
 
-const Event = function(jsonData) {
-  this.events = [...jsonData.body.events].slice(0, 20).map((event) => {
-    const link = event.url;
-    const name = event.name.text;
-    const event_date = new Date(event.start.utc).toDateString();
-    const summary = event.description.text;
+// Database Setup
+//            postgres protocol
+const client = new pg.Client(process.env.DATABASE_URL);
+client.connect();
 
-    return {
-      'link': link,
-      'name': name,
-      'event_date': event_date,
-      'summary': summary
-    };
-  });
-};
+//routes
+app.get('/location', (request, response) => {
+  try {
+    // queryData is what the user typed into the box in the FE and hit "explore"
+    const queryData = request.query.data;
+    getLatLng(queryData)
+      .then(location => response.send(location))
+      .catch(error => errorHandling(error, response));
 
-const checkLocationDB = function(queryData, response){
-  const sqlStatement = 'SELECT * FROM location WHERE search_query = $1';
-  const values = [ queryData ];
-  return pgClient.query(sqlStatement,values).then((data) => {
-    if(data.rowCount) {
-      return response.status(200).send(data.rows[0]);
-
-    } else {
-      let geocodeURL = `https://maps.googleapis.com/maps/api/geocode/json?address=${queryData}&key=${process.env.GEOCODE_API_KEY}`;
-      superagent.get(geocodeURL)
-        .end((err, res) => {
-          if (err && err.status !== 200) {
-            const errorResponse500 = {'status': 500, 'responseText': 'Sorry, something went wrong' };
-            return response.status(500).send(errorResponse500);
-          } else {
-            let location = new Location(queryData, res.body.results[0]);
-            const sqlInsert = 'INSERT INTO location (latitude, longitude, formatted_query, search_query) VALUES ($1, $2, $3, $4)';
-            const args = [ location.latitude, location.longitude, location.formatted_query, location.search_query];
-
-            pgClient.query(sqlInsert, args);
-            return response.status(200).send(location);
-          }
-        });
-    }
-  });
-};
-
-const checkOtherDB = function(queryData, response, tableName, errorHandler){
-  const weatherURL =`https://api.darksky.net/forecast/${process.env.WEATHER_API_KEY}/${queryData.query.data.latitude},${queryData.query.data.longitude}`;
-  const eventURL =`https://www.eventbriteapi.com/v3/events/search?location.longitude=${queryData.query.data.longitude}&location.latitude=${queryData.query.data.latitude}&expand=venue&token=${process.env.EVENTBRITE_API_KEY}`;
-  let sqlStatement;
-  if (tableName === 'weather'){
-    sqlStatement = 'SELECT * FROM weather WHERE search_query = $1';
-  } else {
-    sqlStatement = 'SELECT * FROM event WHERE search_query = $1';
+  } catch( error ) {
+    console.error(error);
+    errorHandling(error, response);
   }
-  let values = [ queryData.query.data.search_query ];
-  return pgClient.query(sqlStatement, values).then((data) => {
-    if(data.rowCount) {
-      let arr;
-      if (tableName === 'weather'){
-        arr = 'dailyforecast';
-      } else {
-        arr = 'events';
-      }
-      return response.status(200).send(data.rows[0][arr]);
-    } else {
-      let URL;
-      if (tableName === 'weather'){
-        URL = weatherURL;
-      } else {
-        URL = eventURL;
-      }
-      superagent.get(URL)
-        .end((err, res) => {
-          if (err && err.status !== 200) {
-            errorHandler(response, 500);
-          } else {
-            let resultObject;
-            let sqlInsert;
-            let args;
-            if (tableName === 'weather') {
-              resultObject = new Weather(res);
-              sqlInsert = 'INSERT INTO weather (dailyForecast, search_query) VALUES ($1, $2)';
-              args = [JSON.stringify(resultObject.dailyForecast), queryData.query.data.search_query];
-              pgClient.query(sqlInsert, args);
-              return response.status(200).send(resultObject.dailyForecast);
+});
 
-            } else {
-              resultObject = new Event(res);
-              sqlInsert = 'INSERT INTO event (events, search_query) VALUES ($1, $2)';
-              args = [JSON.stringify(resultObject.events), queryData.query.data.search_query];
-              pgClient.query(sqlInsert, args);
-              return response.status(200).send(resultObject.events);
-            }
-          }
-        });
-    }
+//route for weather daily data
+app.get('/weather', (request, response) => {
+  try {
+    getWeather(request.query.data)
+      .then(weather => response.send(weather))
+      .catch(error => errorHandling(error, response));
+
+  } catch( error ) {
+    errorHandling(error, response);
+  }
+});
+
+//route for eventbrite
+app.get('/events', (request, response) => {
+  try {
+    getEvents(request.query.data)
+      .then(events => response.send(events))
+      .catch(error => errorHandling(error, response));
+  } catch( error ) {
+    errorHandling(error, response);
+  }
+});
+
+// Function for getting all the daily weather
+function getDailyWeather(weatherData){
+  console.log('in getDailyWeather');
+  let weatherArr = weatherData.daily.data;
+  return weatherArr.map(day => {
+    return new DaysWeather(day.summary, day.time, weatherData.latitude, weatherData.longitude);
   });
-};
+}
 
-const errorHandler = function(res, code) {
-  const errorResponse = {'status': code, 'responseText': 'Sorry, something went wrong' };
-  return res.status(500).send(errorResponse);
-};
+// Function for handling errors
+function errorHandling(error, response){
+  console.log('ERROR HANDLER HIT', error);
+  response.status(500).send('Sorry, something went wrong');
+}
+
+// helper to process events
+function processEvents(eventsData) {
+  return eventsData.map( event => {
+    return new Event(event);
+  });
+}
+
+//
+function getLatLng(query) {
+  let sqlStatement = 'SELECT * FROM location WHERE search_query = $1;';
+  let values = [query];
+  return client.query(sqlStatement, values)
+    .then ((data)=>{
+      if (data.rowCount > 0) {
+        return data.rows[0];
+      } else {
+        console.log('we have no data in DB!!!');
+        let geocodeURL = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GOOGLE_MAPS_API_KEY}`;
+        return superagent.get(geocodeURL)
+          .then(googleMapsApiResponse => {
+            let location = new Location(query, googleMapsApiResponse.body);
+            let insertStatement = 'INSERT INTO location (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4)';
+            let insertValues = [location.search_query, location.formatted_query, location.latitude, location.longitude];
+            client.query(insertStatement, insertValues);
+            console.log(location);
+            return location;
+          })
+          .catch(error => errorHandling(error));
+      }
+    });
+}
+
+// weather endpoint handler
+function getWeather(query){
+  let sqlStatement = 'SELECT * FROM weather WHERE latitude = $1 AND longitude = $2;';
+  let values = [query.latitude, query.longitude];
+  return client.query(sqlStatement, values)
+    .then((data) => {
+      if (data.rowCount > 0) {
+        console.log('we hit this');
+        return data.rows.map(day => {
+          day.time = new Date(day.time).toDateString();
+          return day;
+        });
+      } else {
+        let darkskyURL = `https://api.darksky.net/forecast/${process.env.DARK_SKY_API_KEY}/${query.latitude},${query.longitude}`;
+        return superagent.get(darkskyURL)
+          .then(weatherApiResponse => {
+            let dailyWeather = getDailyWeather(weatherApiResponse.body);
+            dailyWeather.forEach(day => {
+              let insertStatement = 'INSERT INTO weather (forecast, time, latitude, longitude) VALUES ($1, $2, $3, $4)';
+              let insertValues = [day.forecast, day.time, day.latitude, day.longitude];
+              client.query(insertStatement, insertValues);
+            });
+            return dailyWeather;
+          });
+      }
+    });
+
+}
+
+// events endpoint handler
+function getEvents(query) {
+  let sqlStatement = 'SELECT * FROM events WHERE latitude = $1 AND longitude = $2;';
+  let values = [query.latitude, query.longitude];
+  return client.query(sqlStatement, values)
+    .then((data) => {
+      if (data.rowCount > 0) {
+        return data.rows.map(event => {
+          event.event_date = new Date(event.event_date).toDateString();
+          return event;
+        });
+      } else {
+        let eventsURL = `https://www.eventbriteapi.com/v3/events/search?location.longitude=${query.longitude}&location.latitude=${query.latitude}&expand=venue&token=${process.env.EVENTBRITE_API_KEY}`;
+        return superagent.get(eventsURL)
+          .then(eventsApiResponse => {
+            let events = processEvents(eventsApiResponse.body.events.slice(0, 21));
+            events.forEach(event => {
+              let insertStatement = 'INSERT INTO events (link, name, event_date, summary, latitude, longitude) VALUES ($1, $2, $3, $4, $5, $6)';
+              let insertValues = [event.link, event.name, event.event_date, event.summary, query.latitude, query.longitude];
+              client.query(insertStatement, insertValues);
+            });
+            return events;
+          });
+      }
+    });
+
+}
+
+
+app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
